@@ -1,8 +1,8 @@
 export class Lead {
     constructor(
-      public name: string,
-      public email: string,
-      public phone: string,
+      public name?: string,
+      public email?: string,
+      public phone?: string,
       public status: 'pending' | 'processed' | 'retrying' | 'dead' = 'pending',
       public retryCount: number = 0,
     ) {}
