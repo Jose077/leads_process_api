@@ -14,6 +14,10 @@ export class Lead {
     incrementRetryCount(): void {
       this.retryCount += 1;
     }
+
+    markAsProcessed(): void {
+      this.status = 'processed';
+    }
   
     markAsDead(): void {
       this.status = 'dead';

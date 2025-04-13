@@ -1,6 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
-import { LeadStatus } from 'src/leads/domain/enums/lead-status.enum';
+import { LeadStatusEnum } from 'src/leads/domain/enums/lead-status.enum';
 
 export type CatDocument = HydratedDocument<Lead>;
 
@@ -19,7 +19,7 @@ export class Lead {
   source?: string;
 
   @Prop({ default: 'pending' })
-  status: LeadStatus
+  status: LeadStatusEnum
 
   @Prop()
   retryCount?: number;

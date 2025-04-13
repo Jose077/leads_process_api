@@ -13,4 +13,12 @@ export class LeadRepository implements ILeadRepository {
         const newLead =  new this.leadModel(lead)
         return await newLead.save();
     }
+
+    async updateLead(lead: Lead): Promise<Lead | null> {
+        return await this.leadModel.findOneAndUpdate(
+          { name: lead.name, email: lead.email },
+          lead,
+          { new: true }
+        );
+    }
 }
