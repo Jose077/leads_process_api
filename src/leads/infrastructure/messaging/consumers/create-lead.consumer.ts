@@ -17,15 +17,14 @@ export class CreateLeadConsumer {
     const lead = new Lead(leadIN.name, leadIN.email, leadIN.phone);
 
     this.logger.log(`Received message: ${JSON.stringify(leadIN)}`);
-    
-    try {
-      await this.createLeadUseCase.execute(lead);
-      this.logger.log(`Mensage processed: ${JSON.stringify(leadIN)}`);
-      await channel.ack(originalMsg)
-    } catch(error) {
-      this.logger.log(`Error creating lead: ${error.message}`);
-      await channel.nack(originalMsg);
+
+    let createdLead = await this.createLeadUseCase.execute(lead);
+    if (createdLead !== null) {
+      this.logger.log(`Lead created: ${JSON.stringify(createdLead)}`);
+      return
     }
+
+    await channel.ack(originalMsg)
 
     return
   }

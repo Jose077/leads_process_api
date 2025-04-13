@@ -13,11 +13,24 @@ const configService = new ConfigService();
     imports: [
         ClientsModule.register([
             {
-                name: 'LEADS_RETRY_CLIENT',
+                name: 'RETRY_LEADS_QUEUE_CLIENT',
                 transport: Transport.RMQ,
                 options: {
                 urls: [`amqp://${configService.get<string>('RABBITMQ_USER')}:${configService.get<string>('RABBITMQ_PASSWORD')}@${configService.get<string>('RABBITMQ_URL')}`],
                 queue: 'leads-retry-queue',
+                queueOptions: {
+                    durable: false,
+                    expires: 60000, // 1min
+                    deadLetterExchange: '',
+                    deadLetterRoutingKey: 'leads-queue',
+                }},
+            },
+            {
+                name: 'DEAD_LEADS_QUEUE_CLIENT',
+                transport: Transport.RMQ,
+                options: {
+                urls: [`amqp:${configService.get<string>('RABBITMQ_USER')}:${configService.get<string>('RABBITMQ_PASSWORD')}@${configService.get<string>('RABBITMQ_URL')}`],
+                queue: 'leads-dlq',
                 queueOptions: {
                     durable: false
                 }},
