@@ -5,37 +5,52 @@ import { CreateLeadUseCase } from './application/use-cases/create-lead/create-le
 import { LeadRepository } from './infrastructure/database/mongoose/repository/lead.repository';
 import { CreateLeadConsumer } from './infrastructure/messaging/consumers/create-lead.consumer';
 import { ClientsModule, Transport } from '@nestjs/microservices';
-import { ConfigService } from '@nestjs/config';
-
-const configService = new ConfigService();
+import { ConfigModule, ConfigService } from '@nestjs/config';
 
 @Module({
     imports: [
-        ClientsModule.register([
-            {
-                name: 'RETRY_LEADS_QUEUE_CLIENT',
-                transport: Transport.RMQ,
-                options: {
-                urls: [`amqp://${configService.get<string>('RABBITMQ_USER')}:${configService.get<string>('RABBITMQ_PASSWORD')}@${configService.get<string>('RABBITMQ_URL')}`],
+        ConfigModule,
+        ClientsModule.registerAsync([
+          {
+            name: 'RETRY_LEADS_QUEUE_CLIENT',
+            imports: [ConfigModule],
+            useFactory: async (configService: ConfigService) => ({
+              transport: Transport.RMQ,
+              options: {
+                urls: [
+                  `amqp://${configService.get<string>('RABBITMQ_USER')}:${configService.get<string>('RABBITMQ_PASSWORD')}@${configService.get<string>('RABBITMQ_URL')}`,
+                ],
                 queue: 'leads-retry-queue',
                 queueOptions: {
-                    durable: false,
-                    expires: 60000, // 1min
-                    deadLetterExchange: '',
-                    deadLetterRoutingKey: 'leads-queue',
-                }},
-            },
-            {
-                name: 'DEAD_LEADS_QUEUE_CLIENT',
-                transport: Transport.RMQ,
-                options: {
-                urls: [`amqp:${configService.get<string>('RABBITMQ_USER')}:${configService.get<string>('RABBITMQ_PASSWORD')}@${configService.get<string>('RABBITMQ_URL')}`],
+                  durable: true,
+                  arguments: {
+                    'x-message-ttl': 20000, // 20s
+                    'x-dead-letter-exchange': '', // default exchange
+                    'x-dead-letter-routing-key': 'leads-queue',
+                  },
+                },
+              },
+            }),
+            inject: [ConfigService],
+          },
+          {
+            name: 'DEAD_LEADS_QUEUE_CLIENT',
+            imports: [ConfigModule],
+            useFactory: async (configService: ConfigService) => ({
+              transport: Transport.RMQ,
+              options: {
+                urls: [
+                  `amqp://${configService.get<string>('RABBITMQ_USER')}:${configService.get<string>('RABBITMQ_PASSWORD')}@${configService.get<string>('RABBITMQ_URL')}`,
+                ],
                 queue: 'leads-dlq',
                 queueOptions: {
-                    durable: false
-                }},
-            },
-        ]),
+                  durable: true,
+                },
+              },
+            }),
+            inject: [ConfigService],
+          },
+        ]),      
         MongooseModule.forFeature([{ name: Lead.name, schema: LeadSchema }])],
     providers: [
         CreateLeadUseCase,

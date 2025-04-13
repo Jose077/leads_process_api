@@ -47,6 +47,9 @@ describe('create-lead-use-case', () => {
     expect(createdLead).toBeNull();
   })
 
+  // it('should ignore leads already processed', async () => {})
+  // it('should update the lead if it already exists but receive a different email or phone', async () => {})
+
   it('should move to the rety queue if receive any error', async () => {
     const lead = new Lead('test-user', 'test-user@email.com');
     await createLeadUseCase.execute(lead)

@@ -2,7 +2,6 @@ import { Lead } from "src/leads/domain/entities/lead.entity";
 import { ILeadRepository } from "src/leads/domain/interfaces/lead.repository";
 
 export class FakeLeadRepository implements ILeadRepository {
-
   private leads: Lead[] = [];
 
   async createLead(lead: Lead): Promise<Lead> {
@@ -19,4 +18,9 @@ export class FakeLeadRepository implements ILeadRepository {
   updateLead(lead: Lead): Promise<Lead | null> {
     throw new Error("Method not implemented.");
   }
+
+  findOne(lead: Lead): Promise<Lead | null> {
+    throw new Error("Method not implemented.");
+  }
+
 }

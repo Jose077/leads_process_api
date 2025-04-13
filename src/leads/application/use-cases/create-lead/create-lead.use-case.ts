@@ -17,6 +17,23 @@ export class CreateLeadUseCase {
   ) {}
 
   logger = new Logger(CreateLeadUseCase.name)
+
+  // Force queues creation
+  async onModuleInit() {
+    try {
+      await this.retryLeadsQueueclient.connect();
+      this.logger.log('Connected to retry leads queue');
+    } catch (error) {
+      this.logger.error('Failed to connect to retry leads queue', error);
+    }
+
+    try {
+      await this.deadLeadsQueueclient.connect();
+      this.logger.log('Connected to dead leads queue');
+    } catch (error) {
+      this.logger.error('Failed to connect to dead leads queue', error);
+    }
+  }
   
   public async execute(lead: Lead): Promise<Lead | null> {
     if (!lead.email && !lead.phone) {
@@ -24,15 +41,32 @@ export class CreateLeadUseCase {
       return null;
     }
 
-    if (lead.retryCount && lead.retryCount >= 5) {
-      this.logger.warn(`Lead ${lead} has reached the maximum retry count, therefore it will be moved to the dead letter queue`);
+    const currentLead = await this.leadRepository.findOne(lead);
+
+    if (currentLead?.status === LeadStatusEnum.PROCESSED) {
+      this.logger.warn(`Lead ${lead.email ?? lead.phone} already processed`);
+      return null;
+    }
+
+    if (!!currentLead) {
+      lead.retryCount = currentLead.retryCount
+    }
+
+    if (lead?.retryCount >= 5) {
+      this.logger.warn(`Lead ${lead.email ?? lead.phone} has reached the maximum retry count, therefore it will be moved to the dead letter queue`);
       await this.moveToDLQQueue(lead);
       return null;
     }
 
     try {
-      const createdLead = await this.leadRepository.createLead(lead);
-      return createdLead;
+      if (!currentLead) {
+        const createdLead = await this.leadRepository.createLead(lead);
+        return createdLead;
+      } else {
+        // todo: check if email or phone has changed
+      }
+
+      return null;
     } catch (error) {
       this.logger.error('Error creating lead:', error.message);
       await this.moveToRetryQueue(lead);
@@ -46,15 +80,16 @@ export class CreateLeadUseCase {
 
   private async moveToRetryQueue(lead: Lead) {
     // todo: Add custom ttl estrategy to handle retry
-    
+
     try {
-      await lastValueFrom(this.retryLeadsQueueclient.emit<Lead>('retry-lead', lead));
+      await lastValueFrom(this.retryLeadsQueueclient.emit<Lead>('create-lead', lead));
 
       lead.status = LeadStatusEnum.RETRYING
       lead.incrementRetryCount();
+
       await this.leadRepository.updateLead(lead);
       
-      this.logger.log(`Lead ${lead} moved to retry queue`);
+      this.logger.log(`Lead ${lead.email ?? lead.phone} moved to retry queue`);
     } catch (error) {
       this.logger.error('Error sending lead to retry queue:', error);
       await this.moveToDLQQueue(lead);
@@ -68,10 +103,10 @@ export class CreateLeadUseCase {
       lead.markAsDead();
       await this.leadRepository.updateLead(lead);
 
-      this.logger.log(`Lead ${lead} moved to dlq queue`);
+      this.logger.log(`Lead ${lead.email ?? lead.phone} moved to dlq queue`);
     } catch (error) {
       // todo: handle this error
-      this.logger.error('Error sending lead to retry queue:', error);
+      this.logger.error('Error sending lead to dlq queue:', error);
     }
   }
 }

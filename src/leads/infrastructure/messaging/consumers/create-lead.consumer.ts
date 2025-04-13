@@ -19,9 +19,8 @@ export class CreateLeadConsumer {
     this.logger.log(`Received message: ${JSON.stringify(leadIN)}`);
 
     let createdLead = await this.createLeadUseCase.execute(lead);
-    if (createdLead !== null) {
+    if (!!createdLead) {
       this.logger.log(`Lead created: ${JSON.stringify(createdLead)}`);
-      return
     }
 
     await channel.ack(originalMsg)

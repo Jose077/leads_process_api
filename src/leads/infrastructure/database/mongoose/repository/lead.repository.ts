@@ -21,4 +21,11 @@ export class LeadRepository implements ILeadRepository {
           { new: true }
         );
     }
+
+    async findOne(lead: Lead): Promise<Lead | null> {
+        return await this.leadModel.findOne({
+            email: lead.email,
+            phone: lead.phone,
+        });
+    }
 }
