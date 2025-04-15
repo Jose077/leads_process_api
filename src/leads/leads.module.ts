@@ -22,6 +22,7 @@ import { ExternalHTTPModule } from './infrastructure/http/http.module';
                   `amqp://${configService.get<string>('RABBITMQ_USER')}:${configService.get<string>('RABBITMQ_PASSWORD')}@${configService.get<string>('RABBITMQ_URL')}`,
                 ],
                 queue: 'leads-retry-queue',
+                prefetchCount: 5,
                 queueOptions: {
                   durable: true,
                   arguments: {
@@ -44,6 +45,7 @@ import { ExternalHTTPModule } from './infrastructure/http/http.module';
                   `amqp://${configService.get<string>('RABBITMQ_USER')}:${configService.get<string>('RABBITMQ_PASSWORD')}@${configService.get<string>('RABBITMQ_URL')}`,
                 ],
                 queue: 'leads-dlq',
+                prefetchCount: 5,
                 queueOptions: {
                   durable: true,
                 },
