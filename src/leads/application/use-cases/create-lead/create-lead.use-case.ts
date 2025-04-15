@@ -4,6 +4,7 @@ import { Lead } from '../../../domain/entities/lead.entity';
 import { ClientProxy } from '@nestjs/microservices';
 import { lastValueFrom } from 'rxjs';
 import { LeadStatusEnum } from 'src/leads/domain/enums/lead-status.enum';
+import { CreateExternalLeadService } from 'src/leads/infrastructure/http/external-lead-service/create-external-lead.service';
 
 @Injectable()
 export class CreateLeadUseCase {
@@ -13,7 +14,8 @@ export class CreateLeadUseCase {
     @Inject('RETRY_LEADS_QUEUE_CLIENT') 
     private readonly retryLeadsQueueclient: ClientProxy,
     @Inject('DEAD_LEADS_QUEUE_CLIENT') 
-    private readonly deadLeadsQueueclient: ClientProxy
+    private readonly deadLeadsQueueclient: ClientProxy,
+    private readonly createExternalLeadService: CreateExternalLeadService
   ) {}
 
   logger = new Logger(CreateLeadUseCase.name)
@@ -36,6 +38,8 @@ export class CreateLeadUseCase {
   }
   
   public async execute(lead: Lead): Promise<Lead | null> {
+    let createdLead: Lead | null = null;
+
     if (!lead.email && !lead.phone) {
       this.logger.warn(`Ignoring lead without email and phone: ${lead.name}`);
       return null;
@@ -48,7 +52,7 @@ export class CreateLeadUseCase {
       return null;
     }
 
-    if (!!currentLead) {
+    if (currentLead) {
       lead.retryCount = currentLead.retryCount
     }
 
@@ -58,24 +62,35 @@ export class CreateLeadUseCase {
       return null;
     }
 
+    // Attemps to create the lead in the database
     try {
       if (!currentLead) {
-        const createdLead = await this.leadRepository.createLead(lead);
-        return createdLead;
+        createdLead = await this.leadRepository.createLead(lead);
       } else {
         // todo: check if email or phone has changed
       }
-
-      return null;
     } catch (error) {
       this.logger.error('Error creating lead:', error.message);
       await this.moveToRetryQueue(lead);
       return null;
     }
 
-    // todo: Attemps to create the lead on CRM
-    // todo: change status to processed
-    
+    // Attemps to send the lead to the external system
+    try {
+      await this.createExternalLeadService.sendLeadToExternalSystem({
+        email: lead.email, 
+        phone: lead.phone,
+        name: lead.name,
+      });
+
+      lead.markAsProcessed()
+      await this.leadRepository.updateLead(lead);
+      return lead;
+    } catch (error) {
+      this.logger.log('Send lead to retry queue:', error.message);
+      await this.moveToRetryQueue(lead);
+      return null;
+    }
   }
 
   private async moveToRetryQueue(lead: Lead) {

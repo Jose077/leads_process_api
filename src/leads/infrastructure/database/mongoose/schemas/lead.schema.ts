@@ -9,10 +9,10 @@ export class Lead {
   @Prop()
   name?: string;
 
-  @Prop({ unique: true })
+  @Prop()
   email?: string;
 
-  @Prop({ unique: true })
+  @Prop()
   phone?: string;
 
   @Prop()

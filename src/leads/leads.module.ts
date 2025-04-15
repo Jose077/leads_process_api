@@ -6,6 +6,7 @@ import { LeadRepository } from './infrastructure/database/mongoose/repository/le
 import { CreateLeadConsumer } from './infrastructure/messaging/consumers/create-lead.consumer';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ExternalHTTPModule } from './infrastructure/http/http.module';
 
 @Module({
     imports: [
@@ -24,7 +25,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
                 queueOptions: {
                   durable: true,
                   arguments: {
-                    'x-message-ttl': 20000, // 20s
+                    'x-message-ttl': 60000, // 1min
                     'x-dead-letter-exchange': '', // default exchange
                     'x-dead-letter-routing-key': 'leads-queue',
                   },
@@ -51,13 +52,15 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
             inject: [ConfigService],
           },
         ]),      
-        MongooseModule.forFeature([{ name: Lead.name, schema: LeadSchema }])],
+        MongooseModule.forFeature([{ name: Lead.name, schema: LeadSchema }]),
+        ExternalHTTPModule
+      ],
     providers: [
         CreateLeadUseCase,
         {
             provide: 'LeadRepository',
             useClass: LeadRepository,
-        },
+        }, 
     ],
     controllers: [CreateLeadConsumer]
 })

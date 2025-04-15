@@ -3,6 +3,8 @@ import { CreateLeadUseCase } from './create-lead.use-case';
 import { FakeLeadRepository } from 'src/leads/infrastructure/database/fake/repository/lead.repository';
 import { Lead } from 'src/leads/domain/entities/lead.entity';
 import { of, throwError } from 'rxjs';
+import { ExternalHTTPModule } from 'src/leads/infrastructure/http/http.module';
+import { CreateExternalLeadService } from 'src/leads/infrastructure/http/external-lead-service/create-external-lead.service';
 
 describe('create-lead-use-case', () => {
   let createLeadUseCase: CreateLeadUseCase;
@@ -10,12 +12,17 @@ describe('create-lead-use-case', () => {
     emit: jest.fn().mockReturnValue(of(true)), // mocking observable
   };
 
-  const mocDeadLeadQueueCliente = {
-    emit: jest.fn().mockReturnValue(of(true)), // mocking observable
+  const mockDeadLeadQueueCliente = {
+    emit: jest.fn().mockReturnValue(of(true)), 
   };
+
+  const mockCreateExternalLeadService = {
+    sendLeadToExternalSystem: jest.fn().mockReturnValue(of(true)),
+  }
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
+      imports: [ExternalHTTPModule],
       providers: [
         CreateLeadUseCase,
         {
@@ -28,53 +35,85 @@ describe('create-lead-use-case', () => {
         },
         {
           provide: 'DEAD_LEADS_QUEUE_CLIENT',
-          useValue: mocDeadLeadQueueCliente,
-        }
+          useValue: mockDeadLeadQueueCliente,
+        },
       ],
-    }).compile();
+    })
+    .overrideProvider(CreateExternalLeadService)
+    .useValue(mockCreateExternalLeadService)
+    .compile();
 
     createLeadUseCase = module.get<CreateLeadUseCase>(CreateLeadUseCase);
   });
 
   it('should be able to create a new lead', async () => {
-    const lead = new Lead('test-user', 'test-user@email.com');
-    await expect(createLeadUseCase.execute(lead)).resolves.toBeInstanceOf(Lead);
+    const lead = new Lead(
+      'test-user', 
+      'test-user@email.com'
+    );
+    const createdLead = await createLeadUseCase.execute(lead)
+
+    expect(createdLead).toBeInstanceOf(Lead);
+    expect(createdLead?.status).toEqual('processed');
   });
 
-  it('should ignore leads missing an email and phone', async () => {
+  it('should ignore leads missing email and phone', async () => {
     const leadMissingEmailAndPhone = new Lead('test-user');
+
     let createdLead = await createLeadUseCase.execute(leadMissingEmailAndPhone)
     expect(createdLead).toBeNull();
   })
 
   // it('should ignore leads already processed', async () => {})
+
   // it('should update the lead if it already exists but receive a different email or phone', async () => {})
 
   it('should move to the rety queue if receive any error', async () => {
-    const lead = new Lead('test-user', 'test-user@email.com');
-    await createLeadUseCase.execute(lead)
+    const lead = new Lead(
+      'test-user', 
+      'test-user@email.com'
+    );
 
+    mockCreateExternalLeadService.sendLeadToExternalSystem.mockRejectedValue(throwError(() => new Error('Fail')));
     let createdLead = await createLeadUseCase.execute(lead)
+    
     expect(createdLead).toBeNull();
-    expect(mockRetryLeadsQueueClient.emit).toHaveBeenCalledWith('retry-lead', lead);
+    expect(mockRetryLeadsQueueClient.emit).toHaveBeenCalledWith('create-lead', lead);
     
   });
 
   it('should move to the dead letter queue if retry count is greater than 5', async () => {
-    const lead = new Lead('test-user', 'test-user@email.com',  undefined, undefined, 5);
+    const lead = new Lead(
+      'test-user', 
+      'test-user@email.com',  
+      undefined, 
+      undefined, 
+      5
+    );
+
     let createdLead = await createLeadUseCase.execute(lead)
+
     expect(createdLead).toBeNull();
-    expect(mocDeadLeadQueueCliente.emit).toHaveBeenCalledWith('dead-lead', lead);
+    expect(mockDeadLeadQueueCliente.emit).toHaveBeenCalledWith('dead-lead', lead);
   })
 
-  it('should move to the dead letter queue if moving to retry queue fails', async () => {
-    const lead = new Lead('test-user', 'test-user@email.com');
-    await createLeadUseCase.execute(lead)
+  it('should move to the dead letter queue if sending to the external service fails', async () => {
+    const lead = new Lead(
+      'test-user', 
+      'test-user@email.com'
+    );
 
-    mockRetryLeadsQueueClient.emit.mockReturnValue(throwError(() => new Error('fail')));
+    mockCreateExternalLeadService.sendLeadToExternalSystem.mockRejectedValue(
+      new Error('Fail')
+    );
+    mockRetryLeadsQueueClient.emit.mockReturnValue(
+      throwError(() => new Error('Fail'))
+    );
+
     let createdLead = await createLeadUseCase.execute(lead)
+
     expect(createdLead).toBeNull();
-    expect(mockRetryLeadsQueueClient.emit).toHaveBeenCalledWith('retry-lead', lead);
-    expect(mocDeadLeadQueueCliente.emit).toHaveBeenCalledWith('dead-lead', lead);
+    expect(mockRetryLeadsQueueClient.emit).toHaveBeenCalledWith('create-lead', lead);
+    expect(mockDeadLeadQueueCliente.emit).toHaveBeenCalledWith('dead-lead', lead);
   })
 });

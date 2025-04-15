@@ -9,7 +9,7 @@ const configService = new ConfigService();
   imports: [
     ConfigModule.forRoot({isGlobal: true}),
     MongooseModule.forRoot(configService.get<string>('MONGO_URI') ?? ''),
-    LeadsModule
+    LeadsModule,
   ],
 })
 export class AppModule {}
