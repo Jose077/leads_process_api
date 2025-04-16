@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ILeadRepository } from '../../../domain/interfaces/lead.repository';
 import { Lead } from '../../../domain/entities/lead.entity';
-import { ClientProxy } from '@nestjs/microservices';
+import { ClientProxy, RmqRecordBuilder } from '@nestjs/microservices';
 import { lastValueFrom } from 'rxjs';
 import { LeadStatusEnum } from 'src/leads/domain/enums/lead-status.enum';
 import { CreateExternalLeadService } from 'src/leads/infrastructure/http/external-lead-service/create-external-lead.service';
@@ -97,7 +97,12 @@ export class CreateLeadUseCase {
     // todo: Add custom ttl estrategy to handle retry
 
     try {
-      await lastValueFrom(this.retryLeadsQueueclient.emit<Lead>('create-lead', lead));
+      const msg = new RmqRecordBuilder(lead)
+      .setOptions({
+        persistent: true,
+      })
+      .build();
+      await lastValueFrom(this.retryLeadsQueueclient.emit('create-lead', msg));
 
       lead.status = LeadStatusEnum.RETRYING
       lead.incrementRetryCount();
@@ -113,7 +118,13 @@ export class CreateLeadUseCase {
 
   private async moveToDLQQueue(lead: Lead) {
     try {
-      await lastValueFrom(this.deadLeadsQueueclient.emit('dead-lead', lead));
+      const msg = new RmqRecordBuilder(lead)
+      .setOptions({
+        persistent: true,
+      })
+      .build();
+
+      await lastValueFrom(this.deadLeadsQueueclient.emit('dead-lead', msg));
 
       lead.markAsDead();
       await this.leadRepository.updateLead(lead);

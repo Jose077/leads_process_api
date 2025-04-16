@@ -78,7 +78,11 @@ describe('create-lead-use-case', () => {
     let createdLead = await createLeadUseCase.execute(lead)
     
     expect(createdLead).toBeNull();
-    expect(mockRetryLeadsQueueClient.emit).toHaveBeenCalledWith('create-lead', lead);
+    expect(mockRetryLeadsQueueClient.emit).toHaveBeenCalledWith('create-lead',   
+      expect.objectContaining({
+        data: lead,
+      })
+    );
     
   });
 
@@ -94,7 +98,11 @@ describe('create-lead-use-case', () => {
     let createdLead = await createLeadUseCase.execute(lead)
 
     expect(createdLead).toBeNull();
-    expect(mockDeadLeadQueueCliente.emit).toHaveBeenCalledWith('dead-lead', lead);
+    expect(mockDeadLeadQueueCliente.emit).toHaveBeenCalledWith('dead-lead',       
+      expect.objectContaining({
+        data: lead,
+      })
+    );
   })
 
   it('should move to the dead letter queue if sending to the external service fails', async () => {
@@ -113,7 +121,15 @@ describe('create-lead-use-case', () => {
     let createdLead = await createLeadUseCase.execute(lead)
 
     expect(createdLead).toBeNull();
-    expect(mockRetryLeadsQueueClient.emit).toHaveBeenCalledWith('create-lead', lead);
-    expect(mockDeadLeadQueueCliente.emit).toHaveBeenCalledWith('dead-lead', lead);
+    expect(mockRetryLeadsQueueClient.emit).toHaveBeenCalledWith('create-lead', 
+      expect.objectContaining({
+        data: lead,
+      })
+    );
+    expect(mockDeadLeadQueueCliente.emit).toHaveBeenCalledWith('dead-lead', 
+      expect.objectContaining({
+        data: lead,
+      })
+    );
   })
 });
