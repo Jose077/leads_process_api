@@ -11,7 +11,7 @@ async function bootstrap() {
     options: {
       urls: [`amqp://${configService.get<string>('RABBITMQ_USER')}:${configService.get<string>('RABBITMQ_PASSWORD')}@${configService.get<string>('RABBITMQ_URL')}`],
       queue: 'leads-queue',
-      prefetchCount: 5,
+      prefetchCount: 50,
       queueOptions: {
           durable: true,
       },
